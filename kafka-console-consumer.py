@@ -5,10 +5,11 @@ kafka-console-consumer.py
 Author: Vijay Anand Karthikeyan
 """
 
+import sys
 from argparse import ArgumentParser
 from confluent_kafka import Consumer
 
-parser = ArgumentParser(description = 'Kakfa Console consumer in Python', epilog = 'Sample command: %(prog)s --bootstrap.servers=kafkabroker.example.com:6667 --topic=mytopic --security.protocol=SASL_PLAINTEXT --group.id=defaultgroup --sasl.kerberos.principal=user@EXAMPLE.COM --sasl.kerberos.keytab=user.keytab')
+parser = ArgumentParser(description = 'Kakfa Console consumer in Python')
 
 paramKafkaGrp = parser.add_argument_group('paramKafkaGrp', 'Configuration Parameters for Kafka broker')
 paramKafkaGrp.add_argument('--bootstrap.servers', required = True, action = 'store', dest = 'bootstrapServers', 
@@ -19,15 +20,26 @@ paramKafkaGrp.add_argument('--security.protocol', action = 'store', dest = 'secu
                             help = 'Protocol Used for connection (default: %(default)s)')
 paramKafkaGrp.add_argument('--group.id', action = 'store', dest = 'groupId',default = 'defaultgroup',
                             help = 'Group ID (default: %(default)s)')
-paramKafkaGrp.add_argument('--session.timeout.ms', action = 'store', dest = 'timeOut', default = 6000,
-                            help = 'Session Timeout (default: %(default)s)')
 
 paramAuthGrp = parser.add_argument_group('paramAuthGrp', 'Parameters for authentication')
-paramAuthGrp.add_argument('--sasl.kerberos.principal', required = True, action = 'store', dest = 'kerberosPrincipal', 
+paramAuthGrp.add_argument('--sasl.kerberos.principal', required = False, action = 'store', dest = 'kerberosPrincipal', 
                             help = 'User Principal for connection')
-paramAuthGrp.add_argument('--sasl.kerberos.keytab', required = True, action = 'store', dest = 'kerberosKeytab', 
+paramAuthGrp.add_argument('--sasl.kerberos.keytab', required = False, action = 'store', dest = 'kerberosKeytab', 
                             help = 'Keytab for connection')
+paramAuthGrp.add_argument('--useticketcache', required = False, action = 'store_true', dest = 'useTicketCache', default = True,
+                            help = 'Use Kerberos ticket from cache (default: %(default)s)')
 args = parser.parse_args()
+
+if args.useTicketCache and (args.kerberosKeytab or args.kerberosPrincipal):
+    parser.error("--sasl.kerberos.principal and --sasl.kerberos.keytab|--useticketcache are mutually exclusive ...")
+    sys.exit(2)
+
+kinitCommand=""
+if args.useTicketCache:
+    kinitCommand = 'echo -ne ""'
+    print("Getting Kerberos ticket from cache...")
+else:
+    kinitCommand = 'kinit -k -t "'+ args.kerberosKeytab + '" ' + args.kerberosPrincipal
 
 conf = {
   'bootstrap.servers': args.bootstrapServers,
@@ -35,7 +47,7 @@ conf = {
   'sasl.kerberos.principal': args.kerberosPrincipal,
   'sasl.kerberos.keytab': args.kerberosKeytab,
   'security.protocol': args.securityProtocol,
-  'sasl.kerberos.kinit.cmd': 'kinit -k -t "%{sasl.kerberos.keytab}" %{sasl.kerberos.principal}'
+  'sasl.kerberos.kinit.cmd': kinitCommand
 }
 
 c = Consumer( ** conf)

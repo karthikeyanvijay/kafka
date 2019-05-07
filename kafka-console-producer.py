@@ -6,11 +6,11 @@ Author: Vijay Anand Karthikeyan
 
 """
 
-
+import sys
 from argparse import ArgumentParser
 from confluent_kafka import Producer
 
-parser = ArgumentParser(description = 'Kakfa Console Producer in Python', epilog = 'Sample command: %(prog)s --bootstrap.servers=kafkabroker.example.com:6667 --topic=mytopic --security.protocol=SASL_PLAINTEXT --group.id=defaultgroup --sasl.kerberos.principal=user@EXAMPLE.COM --sasl.kerberos.keytab=user.keytab')
+parser = ArgumentParser(description = 'Kakfa Console Producer in Python')
 
 paramKafkaGrp = parser.add_argument_group('paramKafkaGrp', 'Configuration Parameters for Kafka broker')
 paramKafkaGrp.add_argument('--bootstrap.servers', required = True, action = 'store', dest = 'bootstrapServers', 
@@ -25,12 +25,24 @@ paramKafkaGrp.add_argument('--session.timeout.ms', action = 'store', dest = 'tim
                             help = 'Session Timeout (default: %(default)s)')
 
 paramAuthGrp = parser.add_argument_group('paramAuthGrp', 'Parameters for authentication')
-paramAuthGrp.add_argument('--sasl.kerberos.principal', required = True, action = 'store', dest = 'kerberosPrincipal', 
-                            help = 'User Principal for connection', )
-paramAuthGrp.add_argument('--sasl.kerberos.keytab', required = True, action = 'store', dest = 'kerberosKeytab', 
-                            help = 'Keytab for connection', )
+paramAuthGrp.add_argument('--sasl.kerberos.principal', required = False, action = 'store', dest = 'kerberosPrincipal', 
+                            help = 'User Principal for connection')
+paramAuthGrp.add_argument('--sasl.kerberos.keytab', required = False, action = 'store', dest = 'kerberosKeytab', 
+                            help = 'Keytab for connection')
+paramAuthGrp.add_argument('--useticketcache', required = False, action = 'store_true', dest = 'useTicketCache', default = True,
+                            help = 'Use Kerberos ticket from cache (default: %(default)s)')
 args = parser.parse_args()
 
+if args.useTicketCache and (args.kerberosKeytab or args.kerberosPrincipal):
+    parser.error("--sasl.kerberos.principal and --sasl.kerberos.keytab|--useticketcache are mutually exclusive ...")
+    sys.exit(2)
+
+kinitCommand=""
+if args.useTicketCache:
+    kinitCommand = 'echo -ne ""'
+    print("Getting Kerberos ticket from cache...")
+else:
+    kinitCommand = 'kinit -k -t "'+ args.kerberosKeytab + '" ' + args.kerberosPrincipal
 
 conf = {
   'bootstrap.servers': args.bootstrapServers,
@@ -39,7 +51,7 @@ conf = {
   'sasl.kerberos.principal': args.kerberosPrincipal,
   'sasl.kerberos.keytab': args.kerberosKeytab,
   'security.protocol': args.securityProtocol,
-  'sasl.kerberos.kinit.cmd': 'kinit -k -t "%{sasl.kerberos.keytab}" %{sasl.kerberos.principal}'
+  'sasl.kerberos.kinit.cmd': kinitCommand
 }
  
 p = Producer( ** conf)
@@ -54,11 +66,7 @@ def delivery_report(err, msg):
 
 try:
   while 1 == 1:
-      # Trigger any available delivery report callbacks from previous produce() calls
       data=raw_input()
-      # Asynchronously produce a message, the delivery report callback
-      # will be triggered from poll() above, or flush() below, when the message has
-      # been successfully delivered or failed permanently.
       p.produce(args.kafkaTopic, data.encode('utf-8'), callback=delivery_report)
       #p.poll(0)
       # Produce message synchronously
