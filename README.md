@@ -17,6 +17,22 @@ curl https://packages.confluent.io/rpm/5.2/confluent.repo -o /etc/yum.repos.d/co
 
 With the incorrect repository setup, the librdkafka-devel package may get installed from EPEL and may be a lower version. If the correct version of the librdkafka-devel is not installed then the install of confluent-kafka installation will fail. Get the latest repo from [here](https://docs.confluent.io/current/installation/installing_cp/rhel-centos.html#systemd-rhel-centos-install).
 
+### Kafka Admin APIs
+Use `kafka-adminapi.py` for admin related functionality
+
+```
+# python kafka-adminapi.py
+Usage: kafka-adminapi.py <bootstrap-brokers> <operation> <args..>
+
+operations:
+ create_topics <topic1> <topic2> ..
+ delete_topics <topic1> <topic2> ..
+ create_partitions <topic1> <new_total_count1> <topic2> <new_total_count2> ..
+ describe_configs <resource_type1> <resource_name1> <resource2> <resource_name2> ..
+ alter_configs <resource_type1> <resource_name1> <config=val,config2=val2> <resource_type2> <resource_name2> <config..> ..
+ delta_alter_configs <resource_type1> <resource_name1> <config=val,config2=val2> <resource_type2> <resource_name2> <config..> ..
+ list [<all|topics|brokers>]
+ ```
 
 ## Kafka Console Producer
 Use `kafka-console-producer.py` to publish messages to the Kafka broker. This script works similar to the kafka-console-producer.sh program which is packaged with the Kafka installation. 
